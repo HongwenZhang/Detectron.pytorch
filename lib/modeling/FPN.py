@@ -261,7 +261,7 @@ class fpn(nn.Module):
 class topdown_lateral_module(nn.Module):
     """Add a top-down lateral module."""
     def __init__(self, dim_in_top, dim_in_lateral):
-        super(topdown_lateral_module, slef).__init__()
+        super(topdown_lateral_module, self).__init__()
         self.dim_in_top = dim_in_top
         self.dim_in_lateral = dim_in_lateral
         self.dim_out = dim_in_top
