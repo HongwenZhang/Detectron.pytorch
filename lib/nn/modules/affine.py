@@ -5,7 +5,7 @@ import torch.nn as nn
 class AffineChannel2d(nn.Module):
     """ A simple channel-wise affine transformation operation """
     def __init__(self, num_features):
-        super().__init__()
+        super(AffineChannel2d, self).__init__()
         self.num_features = num_features
         self.weight = nn.Parameter(torch.Tensor(num_features))
         self.bias = nn.Parameter(torch.Tensor(num_features))

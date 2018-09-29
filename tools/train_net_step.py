@@ -1,4 +1,6 @@
 """ Training script for steps_with_decay policy"""
+from __future__ import absolute_import
+from __future__ import division
 
 import argparse
 import os

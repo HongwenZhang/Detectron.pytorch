@@ -15,7 +15,7 @@ class BilinearInterpolation2d(nn.Module):
     See: https://github.com/shelhamer/fcn.berkeleyvision.org/blob/master/surgery.py
     """
     def __init__(self, in_channels, out_channels, up_scale):
-        super().__init__()
+        super(BilinearInterpolation2d, self).__init__()
         assert in_channels == out_channels
         assert up_scale % 2 == 0, 'Scale should be even'
         self.in_channes = in_channels

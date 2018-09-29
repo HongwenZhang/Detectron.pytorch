@@ -1,3 +1,5 @@
+from __future__ import division
+
 import numpy as np
 
 import torch
@@ -17,7 +19,7 @@ import nn as mynn
 class keypoint_outputs(nn.Module):
     """Mask R-CNN keypoint specific outputs: keypoint heatmaps."""
     def __init__(self, dim_in):
-        super().__init__()
+        super(keypoint_outputs, self).__init__()
         self.upsample_heatmap = (cfg.KRCNN.UP_SCALE > 1)
 
         if cfg.KRCNN.USE_DECONV:
@@ -129,7 +131,7 @@ def keypoint_losses(kps_pred, keypoint_locations_int32, keypoint_weights,
 class roi_pose_head_v1convX(nn.Module):
     """Mask R-CNN keypoint head. v1convX design: X * (conv)."""
     def __init__(self, dim_in, roi_xform_func, spatial_scale):
-        super().__init__()
+        super(roi_pose_head_v1convX, self).__init__()
         self.dim_in = dim_in
         self.roi_xform = roi_xform_func
         self.spatial_scale = spatial_scale

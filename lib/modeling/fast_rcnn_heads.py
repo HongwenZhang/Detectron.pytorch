@@ -11,7 +11,7 @@ import utils.net as net_utils
 
 class fast_rcnn_outputs(nn.Module):
     def __init__(self, dim_in):
-        super().__init__()
+        super(fast_rcnn_outputs, self).__init__()
         self.cls_score = nn.Linear(dim_in, cfg.MODEL.NUM_CLASSES)
         if cfg.MODEL.CLS_AGNOSTIC_BBOX_REG:  # bg and fg
             self.bbox_pred = nn.Linear(dim_in, 4 * 2)
@@ -73,7 +73,7 @@ def fast_rcnn_losses(cls_score, bbox_pred, label_int32, bbox_targets,
 class roi_2mlp_head(nn.Module):
     """Add a ReLU MLP with two hidden layers."""
     def __init__(self, dim_in, roi_xform_func, spatial_scale):
-        super().__init__()
+        super(roi_2mlp_head, self).__init__()
         self.dim_in = dim_in
         self.roi_xform = roi_xform_func
         self.spatial_scale = spatial_scale
@@ -119,7 +119,7 @@ class roi_2mlp_head(nn.Module):
 class roi_Xconv1fc_head(nn.Module):
     """Add a X conv + 1fc head, as a reference if not using GroupNorm"""
     def __init__(self, dim_in, roi_xform_func, spatial_scale):
-        super().__init__()
+        super(roi_Xconv1fc_head, self).__init__()
         self.dim_in = dim_in
         self.roi_xform = roi_xform_func
         self.spatial_scale = spatial_scale
@@ -181,7 +181,7 @@ class roi_Xconv1fc_head(nn.Module):
 class roi_Xconv1fc_gn_head(nn.Module):
     """Add a X conv + 1fc head, with GroupNorm"""
     def __init__(self, dim_in, roi_xform_func, spatial_scale):
-        super().__init__()
+        super(roi_Xconv1fc_gn_head, self).__init__()
         self.dim_in = dim_in
         self.roi_xform = roi_xform_func
         self.spatial_scale = spatial_scale

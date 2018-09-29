@@ -8,7 +8,7 @@ import nn.functional as myF
 
 class GroupNorm(nn.Module):
     def __init__(self, num_groups, num_channels, eps=1e-5, affine=True):
-        super().__init__()
+        super(GroupNorm, self).__init__()
         self.num_groups = num_groups
         self.num_channels = num_channels
         self.eps = eps

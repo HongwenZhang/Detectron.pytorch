@@ -1,4 +1,6 @@
 """ Training Script """
+from __future__ import absolute_import
+from __future__ import division
 
 import argparse
 import distutils.util

@@ -7,7 +7,7 @@ import roi_data.fast_rcnn
 
 class GenerateProposalLabelsOp(nn.Module):
     def __init__(self):
-        super().__init__()
+        super(GenerateProposalLabelsOp, self).__init__()
 
     def forward(self, rpn_rois, roidb, im_info):
         """Op for generating training labels for RPN proposals. This is used

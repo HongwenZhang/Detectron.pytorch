@@ -78,7 +78,7 @@ class fpn(nn.Module):
     similarly for spatial_scale: e.g [1/32, 1/16, 1/8, 1/4]
     """
     def __init__(self, conv_body_func, fpn_level_info, P2only=False):
-        super().__init__()
+        super(fpn, self).__init__()
         self.fpn_level_info = fpn_level_info
         self.P2only = P2only
 
@@ -261,7 +261,7 @@ class fpn(nn.Module):
 class topdown_lateral_module(nn.Module):
     """Add a top-down lateral module."""
     def __init__(self, dim_in_top, dim_in_lateral):
-        super().__init__()
+        super(topdown_lateral_module, slef).__init__()
         self.dim_in_top = dim_in_top
         self.dim_in_lateral = dim_in_lateral
         self.dim_out = dim_in_top
@@ -324,7 +324,7 @@ def get_min_max_levels():
 class fpn_rpn_outputs(nn.Module):
     """Add RPN on FPN specific outputs."""
     def __init__(self, dim_in, spatial_scales):
-        super().__init__()
+        super(fpn_rpn_outputs, self).__init__()
         self.dim_in = dim_in
         self.spatial_scales = spatial_scales
         self.dim_out = self.dim_in

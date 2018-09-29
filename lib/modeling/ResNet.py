@@ -1,3 +1,5 @@
+from __future__ import division
+
 import os
 from collections import OrderedDict
 
@@ -41,7 +43,7 @@ def ResNet152_conv5_body():
 
 class ResNet_convX_body(nn.Module):
     def __init__(self, block_counts):
-        super().__init__()
+        super(ResNet_convX_body, self).__init__()
         self.block_counts = block_counts
         self.convX = len(block_counts) + 1
         self.num_layers = (sum(block_counts) + 3 * (self.convX == 4)) * 3 + 2
@@ -117,7 +119,7 @@ class ResNet_convX_body(nn.Module):
 
 class ResNet_roi_conv5_head(nn.Module):
     def __init__(self, dim_in, roi_xform_func, spatial_scale):
-        super().__init__()
+        super(ResNet_roi_conv5_head, self).__init__()
         self.roi_xform = roi_xform_func
         self.spatial_scale = spatial_scale
 
@@ -248,7 +250,7 @@ class bottleneck_transformation(nn.Module):
 
     def __init__(self, inplanes, outplanes, innerplanes, stride=1, dilation=1, group=1,
                  downsample=None):
-        super().__init__()
+        super(bottleneck_transformation, self).__init__()
         # In original resnet, stride=2 is on 1x1.
         # In fb.torch resnet, stride=2 is on 3x3.
         (str1x1, str3x3) = (stride, 1) if cfg.RESNETS.STRIDE_1X1 else (1, stride)
@@ -298,7 +300,7 @@ class bottleneck_gn_transformation(nn.Module):
 
     def __init__(self, inplanes, outplanes, innerplanes, stride=1, dilation=1, group=1,
                  downsample=None):
-        super().__init__()
+        super(bottleneck_gn_transformation, self).__init__()
         # In original resnet, stride=2 is on 1x1.
         # In fb.torch resnet, stride=2 is on 3x3.
         (str1x1, str3x3) = (stride, 1) if cfg.RESNETS.STRIDE_1X1 else (1, stride)
