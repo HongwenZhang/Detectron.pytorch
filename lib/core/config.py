@@ -18,6 +18,7 @@ import yaml
 
 import nn as mynn
 from utils.collections import AttrDict
+from utils.io import cache_url
 
 __C = AttrDict()
 # Consumers can get config by:
@@ -32,6 +33,9 @@ cfg = __C
 # Training options
 # ---------------------------------------------------------------------------- #
 __C.TRAIN = AttrDict()
+
+# Initialize network with weights from this .pkl file
+__C.TRAIN.WEIGHTS = b''
 
 # Datasets to train on
 # Available dataset list: datasets.dataset_catalog.DATASETS.keys()
@@ -175,6 +179,9 @@ __C.DATA_LOADER.NUM_THREADS = 4
 # Inference ('test') options
 # ---------------------------------------------------------------------------- #
 __C.TEST = AttrDict()
+
+# Initialize network with weights from this .pkl file
+__C.TEST.WEIGHTS = b''
 
 # Datasets to test on
 # Available dataset list: datasets.dataset_catalog.DATASETS.keys()
@@ -435,6 +442,9 @@ __C.MODEL.MASK_ON = False
 # Indicates the model makes keypoint predictions (as in Mask R-CNN for
 # keypoints)
 __C.MODEL.KEYPOINTS_ON = False
+
+# Indicates the model makes body UV predictions (as in DensePose R-CNN)
+__C.MODEL.BODY_UV_ON = False
 
 # Indicates the model's computation terminates with the production of RPN
 # proposals (i.e., it outputs proposals ONLY, no actual object detections)
@@ -857,6 +867,57 @@ __C.KRCNN.NORMALIZE_BY_VISIBLE_KEYPOINTS = True
 
 
 # ---------------------------------------------------------------------------- #
+# Body UV R-CNN options
+# ---------------------------------------------------------------------------- #
+__C.BODY_UV_RCNN = AttrDict()
+
+# The type of RoI head to use for body UV prediction
+__C.BODY_UV_RCNN.ROI_HEAD = b''
+
+# Output size (and size loss is computed on), e.g., 56x56
+__C.BODY_UV_RCNN.HEATMAP_SIZE = -1
+
+# Use bilinear interpolation to upsample the final heatmap by this factor
+__C.BODY_UV_RCNN.UP_SCALE = -1
+
+# Apply a ConvTranspose layer to the features prior to predicting the heatmaps
+__C.KRCNN.USE_DECONV = False
+# Channel dimension of the hidden representation produced by the ConvTranspose
+__C.BODY_UV_RCNN.DECONV_DIM = 256
+# Use a ConvTranspose layer to predict the heatmaps
+__C.BODY_UV_RCNN.USE_DECONV_OUTPUT = False
+# Use dilation in the body UV head
+__C.BODY_UV_RCNN.DILATION = 1
+# Size of the kernels to use in all ConvTranspose operations
+__C.BODY_UV_RCNN.DECONV_KERNEL = 4
+
+# Number of patches in the dataset
+__C.BODY_UV_RCNN.NUM_PATCHES = -1
+
+# Number of stacked Conv layers in body UV head
+__C.BODY_UV_RCNN.NUM_STACKED_CONVS = 8
+# Dimension of the hidden representation output by the body UV head
+__C.BODY_UV_RCNN.CONV_HEAD_DIM = 256
+# Conv kernel size used in the body UV head
+__C.BODY_UV_RCNN.CONV_HEAD_KERNEL = 3
+# Conv kernel weight filling function
+__C.BODY_UV_RCNN.CONV_INIT = b'GaussianFill'
+
+# Standard ROI XFORM options (see FAST_RCNN or MRCNN options)
+__C.BODY_UV_RCNN.ROI_XFORM_METHOD = b'RoIAlign'
+__C.BODY_UV_RCNN.ROI_XFORM_RESOLUTION = 7
+__C.BODY_UV_RCNN.ROI_XFORM_SAMPLING_RATIO = 0
+
+# Weights
+__C.BODY_UV_RCNN.INDEX_WEIGHTS = 5.0
+__C.BODY_UV_RCNN.PART_WEIGHTS = 1.0
+__C.BODY_UV_RCNN.POINT_REGRESSION_WEIGHTS = 0.001
+
+# Train only with images that have body uv annotations
+__C.BODY_UV_RCNN.BODY_UV_IMS = False
+
+
+# ---------------------------------------------------------------------------- #
 # R-FCN options
 # ---------------------------------------------------------------------------- #
 __C.RFCN = AttrDict()
@@ -972,6 +1033,10 @@ __C.EXPECTED_RESULTS_ATOL = 0.005
 # Set to send email in case of an EXPECTED_RESULTS failure
 __C.EXPECTED_RESULTS_EMAIL = ''
 
+# Models and proposals referred to by URL are downloaded to a local cache
+# specified by DOWNLOAD_CACHE
+__C.DOWNLOAD_CACHE = b'data/cache/detectron-download-cache'
+
 # ------------------------------
 # Data directory
 __C.DATA_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'data'))
@@ -1003,7 +1068,7 @@ _SHARE_RES5_HEADS = set(
 )
 
 
-def assert_and_infer_cfg(make_immutable=True):
+def assert_and_infer_cfg(cache_urls=True, make_immutable=True):
     """Call this function in your script after you have finished setting all cfg
     values that are necessary (e.g., merging a config from a file, merging
     command line config options, etc.). By default, this function will also
@@ -1027,8 +1092,23 @@ def assert_and_infer_cfg(make_immutable=True):
         init.normal_ = init.normal
         init.constant_ = init.constant
         nn.GroupNorm = mynn.GroupNorm
+    if cache_urls:
+        cache_cfg_urls()
     if make_immutable:
         cfg.immutable(True)
+
+def cache_cfg_urls():
+    """Download URLs in the config, cache them locally, and rewrite cfg to make
+    use of the locally cached file.
+    """
+    __C.TRAIN.WEIGHTS = cache_url(__C.TRAIN.WEIGHTS, __C.DOWNLOAD_CACHE)
+    __C.TEST.WEIGHTS = cache_url(__C.TEST.WEIGHTS, __C.DOWNLOAD_CACHE)
+    __C.TRAIN.PROPOSAL_FILES = tuple(
+        cache_url(f, __C.DOWNLOAD_CACHE) for f in __C.TRAIN.PROPOSAL_FILES
+    )
+    __C.TEST.PROPOSAL_FILES = tuple(
+        cache_url(f, __C.DOWNLOAD_CACHE) for f in __C.TEST.PROPOSAL_FILES
+    )
 
 
 def merge_cfg_from_file(cfg_filename):

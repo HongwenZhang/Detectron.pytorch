@@ -39,13 +39,15 @@ envu.set_up_matplotlib()
 from pycocotools import mask as COCOmask
 from pycocotools.coco import COCO
 
+import datasets.dataset_catalog as dataset_catalog
 import utils.boxes as box_utils
 from core.config import cfg
 from utils.timer import Timer
-from .dataset_catalog import ANN_FN
-from .dataset_catalog import DATASETS
-from .dataset_catalog import IM_DIR
-from .dataset_catalog import IM_PREFIX
+
+# from .dataset_catalog import ANN_FN
+# from .dataset_catalog import DATASETS
+# from .dataset_catalog import IM_DIR
+# from .dataset_catalog import IM_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -54,19 +56,17 @@ class JsonDataset(object):
     """A class representing a COCO json dataset."""
 
     def __init__(self, name):
-        assert name in DATASETS.keys(), \
+        assert dataset_catalog.contains(name), \
             'Unknown dataset name: {}'.format(name)
-        assert os.path.exists(DATASETS[name][IM_DIR]), \
-            'Image directory \'{}\' not found'.format(DATASETS[name][IM_DIR])
-        assert os.path.exists(DATASETS[name][ANN_FN]), \
-            'Annotation file \'{}\' not found'.format(DATASETS[name][ANN_FN])
+        assert os.path.exists(dataset_catalog.get_im_dir(name)), \
+            'Im dir \'{}\' not found'.format(dataset_catalog.get_im_dir(name))
+        assert os.path.exists(dataset_catalog.get_ann_fn(name)), \
+            'Ann fn \'{}\' not found'.format(dataset_catalog.get_ann_fn(name))
         logger.debug('Creating: {}'.format(name))
         self.name = name
-        self.image_directory = DATASETS[name][IM_DIR]
-        self.image_prefix = (
-            '' if IM_PREFIX not in DATASETS[name] else DATASETS[name][IM_PREFIX]
-        )
-        self.COCO = COCO(DATASETS[name][ANN_FN])
+        self.image_directory = dataset_catalog.get_im_dir(name)
+        self.image_prefix = dataset_catalog.get_im_prefix(name)
+        self.COCO = COCO(dataset_catalog.get_ann_fn(name))
         self.debug_timer = Timer()
         # Set up dataset classes
         category_ids = self.COCO.getCatIds()
@@ -84,33 +84,6 @@ class JsonDataset(object):
         }
         self._init_keypoints()
 
-        # # Set cfg.MODEL.NUM_CLASSES
-        # if cfg.MODEL.NUM_CLASSES != -1:
-        #     assert cfg.MODEL.NUM_CLASSES == 2 if cfg.MODEL.KEYPOINTS_ON else self.num_classes, \
-        #         "number of classes should equal when using multiple datasets"
-        # else:
-        #     cfg.MODEL.NUM_CLASSES = 2 if cfg.MODEL.KEYPOINTS_ON else self.num_classes
-
-    @property
-    def cache_path(self):
-        cache_path = os.path.abspath(os.path.join(cfg.DATA_DIR, 'cache'))
-        if not os.path.exists(cache_path):
-            os.makedirs(cache_path)
-        return cache_path
-
-    @property
-    def valid_cached_keys(self):
-        """ Can load following key-ed values from the cached roidb file
-
-        'image'(image path) and 'flipped' values are already filled on _prep_roidb_entry,
-        so we don't need to overwrite it again.
-        """
-        keys = ['boxes', 'segms', 'gt_classes', 'seg_areas', 'gt_overlaps',
-                'is_crowd', 'box_to_gt_ind_map']
-        if self.keypoints is not None:
-            keys += ['gt_keypoints', 'has_visible_keypoints']
-        return keys
-
     def get_roidb(
             self,
             gt=False,
@@ -118,7 +91,7 @@ class JsonDataset(object):
             min_proposal_size=2,
             proposal_limit=-1,
             crowd_filter_thresh=0
-        ):
+    ):
         """Return an roidb corresponding to the json dataset. Optionally:
            - include ground truth boxes in the roidb
            - add proposals specified in a proposals file
@@ -130,34 +103,18 @@ class JsonDataset(object):
             'are not included.'
         image_ids = self.COCO.getImgIds()
         image_ids.sort()
-        if cfg.DEBUG:
-            roidb = copy.deepcopy(self.COCO.loadImgs(image_ids))[:100]
-        else:
-            roidb = copy.deepcopy(self.COCO.loadImgs(image_ids))
+        roidb = copy.deepcopy(self.COCO.loadImgs(image_ids))
         for entry in roidb:
             self._prep_roidb_entry(entry)
         if gt:
             # Include ground-truth object annotations
-            cache_filepath = os.path.join(self.cache_path, self.name+'_gt_roidb.pkl')
-            if os.path.exists(cache_filepath) and not cfg.DEBUG:
-                self.debug_timer.tic()
-                self._add_gt_from_cache(roidb, cache_filepath)
-                logger.debug(
-                    '_add_gt_from_cache took {:.3f}s'.
+            self.debug_timer.tic()
+            for entry in roidb:
+                self._add_gt_annotations(entry)
+            logger.debug(
+                '_add_gt_annotations took {:.3f}s'.
                     format(self.debug_timer.toc(average=False))
-                )
-            else:
-                self.debug_timer.tic()
-                for entry in roidb:
-                    self._add_gt_annotations(entry)
-                logger.debug(
-                    '_add_gt_annotations took {:.3f}s'.
-                    format(self.debug_timer.toc(average=False))
-                )
-                if not cfg.DEBUG:
-                    with open(cache_filepath, 'wb') as fp:
-                        pickle.dump(roidb, fp, pickle.HIGHEST_PROTOCOL)
-                    logger.info('Cache ground truth roidb to %s', cache_filepath)
+            )
         if proposal_file is not None:
             # Include proposals from a file
             self.debug_timer.tic()
@@ -167,7 +124,7 @@ class JsonDataset(object):
             )
             logger.debug(
                 '_add_proposals_from_file took {:.3f}s'.
-                format(self.debug_timer.toc(average=False))
+                    format(self.debug_timer.toc(average=False))
             )
         _add_class_assignments(roidb)
         return roidb
@@ -184,9 +141,18 @@ class JsonDataset(object):
         entry['image'] = im_path
         entry['flipped'] = False
         entry['has_visible_keypoints'] = False
+        entry['has_body_uv'] = False
         # Empty placeholders
         entry['boxes'] = np.empty((0, 4), dtype=np.float32)
         entry['segms'] = []
+        # densepose entries
+        entry['dp_x'] = []
+        entry['dp_y'] = []
+        entry['dp_I'] = []
+        entry['dp_U'] = []
+        entry['dp_V'] = []
+        entry['dp_masks'] = []
+        #
         entry['gt_classes'] = np.empty((0), dtype=np.int32)
         entry['seg_areas'] = np.empty((0), dtype=np.float32)
         entry['gt_overlaps'] = scipy.sparse.csr_matrix(
@@ -200,6 +166,9 @@ class JsonDataset(object):
             entry['gt_keypoints'] = np.empty(
                 (0, 3, self.num_keypoints), dtype=np.int32
             )
+        if cfg.MODEL.BODY_UV_ON:
+            entry['ignore_UV_body'] = np.empty((0), dtype=np.bool)
+        # entry['Box_image_links_body'] = []
         # Remove unwanted fields that come from the json file (if they exist)
         for k in ['date_captured', 'url', 'license', 'file_name']:
             if k in entry:
@@ -212,6 +181,14 @@ class JsonDataset(object):
         # Sanitize bboxes -- some are invalid
         valid_objs = []
         valid_segms = []
+        ####
+        valid_dp_x = []
+        valid_dp_y = []
+        valid_dp_I = []
+        valid_dp_U = []
+        valid_dp_V = []
+        valid_dp_masks = []
+        ####
         width = entry['width']
         height = entry['height']
         for obj in objs:
@@ -235,8 +212,24 @@ class JsonDataset(object):
                 obj['clean_bbox'] = [x1, y1, x2, y2]
                 valid_objs.append(obj)
                 valid_segms.append(obj['segmentation'])
+                ###
+                if 'dp_x' in obj.keys():
+                    valid_dp_x.append(obj['dp_x'])
+                    valid_dp_y.append(obj['dp_y'])
+                    valid_dp_I.append(obj['dp_I'])
+                    valid_dp_U.append(obj['dp_U'])
+                    valid_dp_V.append(obj['dp_V'])
+                    valid_dp_masks.append(obj['dp_masks'])
+                else:
+                    valid_dp_x.append([])
+                    valid_dp_y.append([])
+                    valid_dp_I.append([])
+                    valid_dp_U.append([])
+                    valid_dp_V.append([])
+                    valid_dp_masks.append([])
+                    ###
         num_valid_objs = len(valid_objs)
-
+        ##
         boxes = np.zeros((num_valid_objs, 4), dtype=entry['boxes'].dtype)
         gt_classes = np.zeros((num_valid_objs), dtype=entry['gt_classes'].dtype)
         gt_overlaps = np.zeros(
@@ -253,8 +246,13 @@ class JsonDataset(object):
                 (num_valid_objs, 3, self.num_keypoints),
                 dtype=entry['gt_keypoints'].dtype
             )
+        if cfg.MODEL.BODY_UV_ON:
+            ignore_UV_body = np.zeros((num_valid_objs))
+            # Box_image_body  = [None]*num_valid_objs
 
         im_has_visible_keypoints = False
+        im_has_any_body_uv = False
+
         for ix, obj in enumerate(valid_objs):
             cls = self.json_category_id_to_contiguous_id[obj['category_id']]
             boxes[ix, :] = obj['clean_bbox']
@@ -266,6 +264,13 @@ class JsonDataset(object):
                 gt_keypoints[ix, :, :] = self._get_gt_keypoints(obj)
                 if np.sum(gt_keypoints[ix, 2, :]) > 0:
                     im_has_visible_keypoints = True
+            if cfg.MODEL.BODY_UV_ON:
+                if 'dp_x' in obj:
+                    ignore_UV_body[ix] = False
+                    im_has_any_body_uv = True
+                else:
+                    ignore_UV_body[ix] = True
+
             if obj['iscrowd']:
                 # Set overlap to -1 for all classes for crowd objects
                 # so they will be excluded during training
@@ -274,9 +279,12 @@ class JsonDataset(object):
                 gt_overlaps[ix, cls] = 1.0
         entry['boxes'] = np.append(entry['boxes'], boxes, axis=0)
         entry['segms'].extend(valid_segms)
-        # To match the original implementation:
-        # entry['boxes'] = np.append(
-        #     entry['boxes'], boxes.astype(np.int).astype(np.float), axis=0)
+        entry['dp_x'].extend(valid_dp_x)
+        entry['dp_y'].extend(valid_dp_y)
+        entry['dp_I'].extend(valid_dp_I)
+        entry['dp_U'].extend(valid_dp_U)
+        entry['dp_V'].extend(valid_dp_V)
+        entry['dp_masks'].extend(valid_dp_masks)
         entry['gt_classes'] = np.append(entry['gt_classes'], gt_classes)
         entry['seg_areas'] = np.append(entry['seg_areas'], seg_areas)
         entry['gt_overlaps'] = np.append(
@@ -292,41 +300,13 @@ class JsonDataset(object):
                 entry['gt_keypoints'], gt_keypoints, axis=0
             )
             entry['has_visible_keypoints'] = im_has_visible_keypoints
-
-    def _add_gt_from_cache(self, roidb, cache_filepath):
-        """Add ground truth annotation metadata from cached file."""
-        logger.info('Loading cached gt_roidb from %s', cache_filepath)
-        with open(cache_filepath, 'rb') as fp:
-            cached_roidb = pickle.load(fp)
-
-        assert len(roidb) == len(cached_roidb)
-
-        for entry, cached_entry in zip(roidb, cached_roidb):
-            values = [cached_entry[key] for key in self.valid_cached_keys]
-            boxes, segms, gt_classes, seg_areas, gt_overlaps, is_crowd, \
-                box_to_gt_ind_map = values[:7]
-            if self.keypoints is not None:
-                gt_keypoints, has_visible_keypoints = values[7:]
-            entry['boxes'] = np.append(entry['boxes'], boxes, axis=0)
-            entry['segms'].extend(segms)
-            # To match the original implementation:
-            # entry['boxes'] = np.append(
-            #     entry['boxes'], boxes.astype(np.int).astype(np.float), axis=0)
-            entry['gt_classes'] = np.append(entry['gt_classes'], gt_classes)
-            entry['seg_areas'] = np.append(entry['seg_areas'], seg_areas)
-            entry['gt_overlaps'] = scipy.sparse.csr_matrix(gt_overlaps)
-            entry['is_crowd'] = np.append(entry['is_crowd'], is_crowd)
-            entry['box_to_gt_ind_map'] = np.append(
-                entry['box_to_gt_ind_map'], box_to_gt_ind_map
-            )
-            if self.keypoints is not None:
-                entry['gt_keypoints'] = np.append(
-                    entry['gt_keypoints'], gt_keypoints, axis=0
-                )
-                entry['has_visible_keypoints'] = has_visible_keypoints
+        if cfg.MODEL.BODY_UV_ON:
+            entry['ignore_UV_body'] = np.append(entry['ignore_UV_body'], ignore_UV_body)
+            # entry['Box_image_links_body'].extend(Box_image_body)
+            entry['has_body_uv'] = im_has_any_body_uv
 
     def _add_proposals_from_file(
-        self, roidb, proposal_file, min_proposal_size, top_k, crowd_thresh
+            self, roidb, proposal_file, min_proposal_size, top_k, crowd_thresh
     ):
         """Add proposals from a proposals file to an roidb."""
         logger.info('Loading proposals from: {}'.format(proposal_file))
@@ -375,11 +355,6 @@ class JsonDataset(object):
                 zip(keypoints, range(len(keypoints))))
             self.keypoints = keypoints
             self.num_keypoints = len(keypoints)
-            if cfg.KRCNN.NUM_KEYPOINTS != -1:
-                assert cfg.KRCNN.NUM_KEYPOINTS == self.num_keypoints, \
-                    "number of keypoints should equal when using multiple datasets"
-            else:
-                cfg.KRCNN.NUM_KEYPOINTS = self.num_keypoints
             self.keypoint_flip_map = {
                 'left_eye': 'right_eye',
                 'left_ear': 'right_ear',

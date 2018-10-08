@@ -54,13 +54,17 @@ def cache_url(url_or_file, cache_dir):
         return url_or_file
 
     url = url_or_file
-    assert url.startswith(_DETECTRON_S3_BASE_URL), \
-        ('Detectron only automatically caches URLs in the Detectron S3 '
-         'bucket: {}').format(_DETECTRON_S3_BASE_URL)
-
-    cache_file_path = url.replace(_DETECTRON_S3_BASE_URL, cache_dir)
+    # assert url.startswith(_DETECTRON_S3_BASE_URL), \
+    #     ('Detectron only automatically caches URLs in the Detectron S3 '
+    #      'bucket: {}').format(_DETECTRON_S3_BASE_URL)
+    #
+    # cache_file_path = url.replace(_DETECTRON_S3_BASE_URL, cache_dir)
+    Len_filename  = len(url.split('/')[-1])
+    BASE_URL  =  url[0:-Len_filename-1]
+    #
+    cache_file_path = url.replace(BASE_URL, cache_dir)
     if os.path.exists(cache_file_path):
-        assert_cache_file_is_ok(url, cache_file_path)
+        # assert_cache_file_is_ok(url, cache_file_path)
         return cache_file_path
 
     cache_file_dir = os.path.dirname(cache_file_path)
@@ -69,7 +73,7 @@ def cache_url(url_or_file, cache_dir):
 
     logger.info('Downloading remote file {} to {}'.format(url, cache_file_path))
     download_url(url, cache_file_path)
-    assert_cache_file_is_ok(url, cache_file_path)
+    # assert_cache_file_is_ok(url, cache_file_path)
     return cache_file_path
 
 
