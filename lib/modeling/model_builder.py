@@ -15,6 +15,7 @@ import modeling.rpn_heads as rpn_heads
 import modeling.fast_rcnn_heads as fast_rcnn_heads
 import modeling.mask_rcnn_heads as mask_rcnn_heads
 import modeling.keypoint_rcnn_heads as keypoint_rcnn_heads
+import modeling.body_uv_rcnn_heads as body_uv_rcnn_heads
 import utils.blob as blob_utils
 import utils.net as net_utils
 import utils.resnet_weights_helper as resnet_utils
@@ -121,6 +122,14 @@ class Generalized_RCNN(nn.Module):
                 self.Keypoint_Head.share_res5_module(self.Box_Head.res5)
             self.Keypoint_Outs = keypoint_rcnn_heads.keypoint_outputs(self.Keypoint_Head.dim_out)
 
+        # DensePose Branch
+        if cfg.MODEL.BODY_UV_ON:
+            self.Body_uv_Head = get_func(cfg.BODY_UV_RCNN.ROI_HEAD)(
+                self.RPN.dim_out, self.roi_feature_transform, self.Conv_Body.spatial_scale)
+            if getattr(self.Body_uv_Head, 'SHARE_RES5', False):
+                self.Body_uv_Head.share_res5_module(self.Box_Head.res5)
+            self.Body_uv_Outs = body_uv_rcnn_heads.body_uv_outputs(self.Body_uv_Head.dim_out)
+
         self._init_modules()
 
     def _init_modules(self):
@@ -131,6 +140,8 @@ class Generalized_RCNN(nn.Module):
                 assert compare_state_dict(self.Mask_Head.res5.state_dict(), self.Box_Head.res5.state_dict())
             if cfg.MODEL.KEYPOINTS_ON and getattr(self.Keypoint_Head, 'SHARE_RES5', False):
                 assert compare_state_dict(self.Keypoint_Head.res5.state_dict(), self.Box_Head.res5.state_dict())
+            if cfg.MODEL.BODY_UV_ON and getattr(self.Body_uv_Head, 'SHARE_RES5', False):
+                assert compare_state_dict(self.Body_uv_Head.res5.state_dict(), self.Box_Head.res5.state_dict())
 
         if cfg.TRAIN.FREEZE_CONV_BODY:
             for p in self.Conv_Body.parameters():
