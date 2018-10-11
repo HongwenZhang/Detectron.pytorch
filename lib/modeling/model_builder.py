@@ -246,6 +246,26 @@ class Generalized_RCNN(nn.Module):
                         rpn_ret['keypoint_loss_normalizer'])
                 return_dict['losses']['loss_kps'] = loss_keypoints
 
+            if cfg.MODEL.BODY_UV_ON:
+                if getattr(self.Body_uv_Head, 'SHARE_RES5', False):
+                    body_uv_feat = self.Body_uv_Head(res5_feat, rpn_ret,
+                                               roi_has_mask_int32=rpn_ret['roi_has_mask_int32'])
+                else:
+                    body_uv_feat = self.Body_uv_Head(blob_conv, rpn_ret)
+                body_u_pred, body_v_pred, body_index_pred, body_ann_pred = self.Body_uv_Outs(body_uv_feat)
+                # return_dict['body_uv_pred'] = body_uv_pred
+                # body uv loss
+                body_uv_keys = ['body_uv_X_points', 'body_uv_Y_points', 'body_uv_I_points', 'body_uv_Ind_points',
+                   'body_uv_U_points', 'body_uv_V_points', 'body_uv_point_weights', 'body_uv_ann_labels',
+                   'body_uv_ann_weights']
+                body_uv_target = {key:rpn_ret[key] for key in body_uv_keys}
+                loss_Upoints, loss_Vpoints, loss_seg_AnnIndex, loss_IndexUVPoints = body_uv_rcnn_heads.body_uv_losses(body_u_pred, body_v_pred, body_index_pred, body_ann_pred,
+                                                                 **body_uv_target)
+                return_dict['losses']['loss_Upoints'] = loss_Upoints
+                return_dict['losses']['loss_Vpoints'] = loss_Vpoints
+                return_dict['losses']['loss_seg_AnnIndex'] = loss_seg_AnnIndex
+                return_dict['losses']['loss_IndexUVPoints'] = loss_IndexUVPoints
+
             # pytorch0.4 bug on gathering scalar(0-dim) tensors
             for k, v in return_dict['losses'].items():
                 return_dict['losses'][k] = v.unsqueeze(0)

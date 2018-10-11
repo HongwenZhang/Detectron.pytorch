@@ -271,6 +271,7 @@ def main():
 
     if cfg.CUDA:
         maskRCNN.cuda()
+        # maskRCNN = torch.nn.DataParallel(maskRCNN).cuda()
 
     ### Optimizer ###
     gn_param_nameset = set()

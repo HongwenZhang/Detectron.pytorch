@@ -28,6 +28,7 @@ import numpy.random as npr
 from core.config import cfg
 import roi_data.keypoint_rcnn
 import roi_data.mask_rcnn
+import roi_data.body_uv_rcnn
 import utils.boxes as box_utils
 import utils.blob as blob_utils
 import utils.fpn as fpn_utils
@@ -81,6 +82,22 @@ def get_fast_rcnn_blob_names(is_training=True):
         # 'keypoint_loss_normalizer': optional normalization factor to use if
         # cfg.KRCNN.NORMALIZE_BY_VISIBLE_KEYPOINTS is False.
         blob_names += ['keypoint_loss_normalizer']
+    if is_training and cfg.MODEL.BODY_UV_ON:
+        blob_names += ['body_uv_rois']
+        blob_names += ['roi_has_body_uv_int32']
+        #########
+        # ###################################################
+        blob_names += ['body_uv_ann_labels']
+        blob_names += ['body_uv_ann_weights']
+        # #################################################
+        blob_names += ['body_uv_X_points']
+        blob_names += ['body_uv_Y_points']
+        blob_names += ['body_uv_Ind_points']
+        blob_names += ['body_uv_I_points']
+        blob_names += ['body_uv_U_points']
+        blob_names += ['body_uv_V_points']
+        blob_names += ['body_uv_point_weights']
+
     if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_ROIS:
         # Support for FPN multi-level rois without bbox reg isn't
         # implemented (... and may never be implemented)
@@ -99,6 +116,10 @@ def get_fast_rcnn_blob_names(is_training=True):
                 for lvl in range(k_min, k_max + 1):
                     blob_names += ['keypoint_rois_fpn' + str(lvl)]
                 blob_names += ['keypoint_rois_idx_restore_int32']
+            if cfg.MODEL.BODY_UV_ON:
+                for lvl in range(k_min, k_max + 1):
+                    blob_names += ['body_uv_rois_fpn' + str(lvl)]
+                blob_names += ['body_uv_rois_idx_restore_int32']
     return blob_names
 
 
@@ -200,6 +221,12 @@ def _sample_rois(roidb, im_scale, batch_idx):
         roi_data.keypoint_rcnn.add_keypoint_rcnn_blobs(
             blob_dict, roidb, fg_rois_per_image, fg_inds, im_scale, batch_idx)
 
+    # Optionally body UV R-CNN blobs
+    if cfg.MODEL.BODY_UV_ON:
+        roi_data.body_uv_rcnn.add_body_uv_rcnn_blobs(
+            blob_dict, sampled_boxes, roidb, im_scale, batch_idx
+        )
+
     return blob_dict
 
 
@@ -276,3 +303,5 @@ def _add_multilevel_rois(blobs):
         _distribute_rois_over_fpn_levels('mask_rois')
     if cfg.MODEL.KEYPOINTS_ON:
         _distribute_rois_over_fpn_levels('keypoint_rois')
+    if cfg.MODEL.BODY_UV_ON:
+        _distribute_rois_over_fpn_levels('body_uv_rois')
