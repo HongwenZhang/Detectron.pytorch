@@ -378,6 +378,13 @@ class Generalized_RCNN(nn.Module):
         kps_pred = self.Keypoint_Outs(kps_feat)
         return kps_pred
 
+    @check_inference
+    def body_uv_net(self, blob_conv, rpn_blob):
+        """For inference"""
+        body_uv_feat = self.Body_uv_Head(blob_conv, rpn_blob)
+        body_uv_pred = self.Body_uv_Outs(body_uv_feat)
+        return body_uv_pred
+
     @property
     def detectron_weight_mapping(self):
         if self.mapping_to_detectron is None:

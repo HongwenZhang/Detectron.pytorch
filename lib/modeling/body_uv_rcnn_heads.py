@@ -88,6 +88,17 @@ class body_uv_outputs(nn.Module):
             'deconv_V.bias': 'V_lowres_b',
         })
 
+        detectron_weight_mapping.update({
+            'upsample_AnnIndex.upconv.weight': None,
+            'upsample_AnnIndex.upconv.bias': None,
+            'upsample_Index_UV.upconv.weight': None,
+            'upsample_Index_UV.upconv.bias': None,
+            'upsample_U.upconv.weight': None,
+            'upsample_U.upconv.bias': None,
+            'upsample_V.upconv.weight': None,
+            'upsample_V.upconv.bias': None,
+        })
+
         return detectron_weight_mapping, []
 
     def forward(self, x):
@@ -232,8 +243,8 @@ class roi_body_uv_head_v1convX(nn.Module):
         detectron_weight_mapping = {}
         orphan_in_detectron = []
         for i in range(cfg.BODY_UV_RCNN.NUM_STACKED_CONVS):
-            detectron_weight_mapping['conv_fcn.%d.weight' % (2*i)] = 'conv_fcn%d_w' % (i+1)
-            detectron_weight_mapping['conv_fcn.%d.bias' % (2*i)] = 'conv_fcn%d_b' % (i+1)
+            detectron_weight_mapping['conv_fcn.%d.weight' % (2*i)] = 'body_conv_fcn%d_w' % (i+1)
+            detectron_weight_mapping['conv_fcn.%d.bias' % (2*i)] = 'body_conv_fcn%d_b' % (i+1)
 
         return detectron_weight_mapping, orphan_in_detectron
 
